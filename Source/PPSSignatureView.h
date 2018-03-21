@@ -6,6 +6,11 @@
 @property (assign, nonatomic) UIColor *strokeColor;
 @property (assign, nonatomic) BOOL hasSignature;
 @property (strong, nonatomic) UIImage *signatureImage;
+@property (nonatomic, assign) float strokWidth;
+
+- (void)undo;
+
+- (void)unAbleUndo;
 
 - (void)erase;
 

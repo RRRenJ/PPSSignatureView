@@ -42,6 +42,9 @@ static inline void addVertex(uint *length, PPSSignaturePoint v) {
     (*length)++;
 }
 
+
+
+
 static inline CGPoint QuadraticPointInCurve(CGPoint start, CGPoint end, CGPoint controlPoint, float percent) {
     double a = pow((1.0 - percent), 2.0);
     double b = 2.0 * percent * (1.0 - percent);
@@ -109,6 +112,9 @@ static PPSSignaturePoint ViewPointToGL(CGPoint viewPoint, CGRect bounds, GLKVect
     PPSSignaturePoint previousVertex;
     PPSSignaturePoint currentVelocity;
 }
+
+
+@property (nonatomic, strong) NSMutableArray * gestureArray;
 
 @end
 
@@ -207,7 +213,44 @@ static PPSSignaturePoint ViewPointToGL(CGPoint viewPoint, CGRect bounds, GLKVect
 	[self setNeedsDisplay];
 }
 
+- (void)undo{
+    if (self.gestureArray.count == 0) {
 
+        return;
+    }
+    if (self.gestureArray.count == 1) {
+        [self.gestureArray removeLastObject];
+        [self erase];
+        return;
+    }
+    
+    NSDictionary * dic = self.gestureArray.lastObject;
+    if ([dic[@"gesture"] isEqualToString:@"tap"]) {
+        for (int index = self.gestureArray.count - 2; index >= 0; index --) {
+            NSDictionary * dict = self.gestureArray[index];
+            if ([dict[@"gesture"] isEqualToString:@"tap"]) {
+                 dotsLength =((NSString *)dict[@"str"]).floatValue;
+                break;
+            }
+            dotsLength = 0;
+        }
+    }else if ([dic[@"gesture"] isEqualToString:@"pan"]){
+        for (int index = self.gestureArray.count - 2; index >= 0; index --) {
+            NSDictionary * dict = self.gestureArray[index];
+            if ([dict[@"gesture"] isEqualToString:@"pan"]) {
+                length =((NSString *)dict[@"str"]).floatValue;
+                break;
+            }
+            length = 0;
+        }
+    }
+    [self.gestureArray removeLastObject];
+    [self setNeedsDisplay];
+}
+
+- (void)unAbleUndo{
+    [self.gestureArray removeAllObjects];
+}
 
 - (UIImage *)signatureImage
 {
@@ -259,6 +302,7 @@ static PPSSignaturePoint ViewPointToGL(CGPoint viewPoint, CGRect bounds, GLKVect
             
             addVertex(&dotsLength, p);
             addVertex(&dotsLength, centerPoint);
+       
             
             angle += M_PI * 2.0 / segments;
         }
@@ -268,12 +312,17 @@ static PPSSignaturePoint ViewPointToGL(CGPoint viewPoint, CGRect bounds, GLKVect
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
     
+    if (t.state == UIGestureRecognizerStateEnded) {
+        NSString * str = [NSString stringWithFormat:@"%ld",dotsLength];
+        [self.gestureArray addObject:@{@"gesture":@"tap",@"str":str}];
+    }
+    
     [self setNeedsDisplay];
 }
 
 
 - (void)longPress:(UILongPressGestureRecognizer *)lp {
-    [self erase];
+//    [self erase];
 }
 
 - (void)pan:(UIPanGestureRecognizer *)p {
@@ -294,7 +343,7 @@ static PPSSignaturePoint ViewPointToGL(CGPoint viewPoint, CGRect bounds, GLKVect
     float normalizedVelocity = (clampedVelocityMagnitude - VELOCITY_CLAMP_MIN) / (VELOCITY_CLAMP_MAX - VELOCITY_CLAMP_MIN);
     
     float lowPassFilterAlpha = STROKE_WIDTH_SMOOTHING;
-    float newThickness = (STROKE_WIDTH_MAX - STROKE_WIDTH_MIN) * (1 - normalizedVelocity) + STROKE_WIDTH_MIN;
+    float newThickness = (self.strokWidth - STROKE_WIDTH_MIN) * (1 - normalizedVelocity) + STROKE_WIDTH_MIN;
     penThickness = penThickness * lowPassFilterAlpha + newThickness * (1 - lowPassFilterAlpha);
     
     if ([p state] == UIGestureRecognizerStateBegan) {
@@ -308,6 +357,7 @@ static PPSSignaturePoint ViewPointToGL(CGPoint viewPoint, CGRect bounds, GLKVect
         
         addVertex(&length, startPoint);
         addVertex(&length, previousVertex);
+        
 		
 		self.hasSignature = YES;
         
@@ -355,7 +405,17 @@ static PPSSignaturePoint ViewPointToGL(CGPoint viewPoint, CGRect bounds, GLKVect
         
         previousVertex = v;
         addVertex(&length, previousVertex);
+        
     }
+    
+    if (p.state == UIGestureRecognizerStateEnded) {
+
+        NSString * str = [NSString stringWithFormat:@"%ld",length];
+
+        [self.gestureArray addObject:@{@"gesture":@"pan",@"str":str}];
+        NSLog(@"%@",self.gestureArray);
+    }
+    
     
 	[self setNeedsDisplay];
 }
@@ -488,5 +548,20 @@ static PPSSignaturePoint ViewPointToGL(CGPoint viewPoint, CGRect bounds, GLKVect
     
     effect = nil;
 }
+
+- (float)strokWidth{
+    if (_strokWidth == 0) {
+        _strokWidth = 0.030;
+    }
+    return _strokWidth;
+}
+
+- (NSMutableArray *)gestureArray{
+    if (!_gestureArray) {
+        _gestureArray = [NSMutableArray array];
+    }
+    return _gestureArray;
+}
+
 
 @end
